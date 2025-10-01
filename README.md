@@ -110,6 +110,15 @@ uv sync
 uv run python agent.py
 ```
 
+### Local Invocation
+You can invoke the agent locally for testing:
+
+```bash
+curl -X POST http://localhost:8080/invocations \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Hello!"}'
+```
+
 ## Project Structure
 
 - `agent.py` - Agent entrypoint
