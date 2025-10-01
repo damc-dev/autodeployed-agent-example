@@ -1,0 +1,67 @@
+name: Deploy Agent to AWS
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+jobs:
+  deploy:
+    # Only run on push to main or when PR is merged to main
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: GitHubActionsAgentDeploy
+
+      - name: Deploy agent with agentcore
+        run: |
+          uv run agentcore launch
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+
+      - name: Upload agent configuration artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bedrock-agentcore-config-${{ github.sha }}
+          path: .bedrock_agentcore.yaml
+          retention-days: 90
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Agent deployed successfully to AWS"
+          echo "Region: us-east-1"
+          echo "Agent ID: agent-3aevBK4TEA"
