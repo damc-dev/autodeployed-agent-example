@@ -49,6 +49,7 @@ jobs:
       - name: Deploy agent with agentcore
         run: |
           uv run agentcore launch
+          cat .bedrock_agentcore.yaml
         env:
           AWS_DEFAULT_REGION: us-east-1
 
@@ -57,12 +58,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bedrock-agentcore-config-${{ github.sha }}
-          path: .bedrock_agentcore.yaml
+          path: ~/.bedrock_agentcore.yaml
           retention-days: 90
 
       - name: Deployment summary
         if: success()
         run: |
           echo "✅ Agent deployed successfully to AWS"
-          echo "Region: us-east-1"
-          echo "Agent ID: agent-3aevBK4TEA"
