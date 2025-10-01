@@ -12,6 +12,8 @@ on:
 
 jobs:
   deploy:
+    # Loads the secrets from the dev environment from the repository settings
+    environment: dev
     # Only run on push to main or when PR is merged to main
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
