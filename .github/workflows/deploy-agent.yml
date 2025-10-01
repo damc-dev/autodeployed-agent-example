@@ -58,7 +58,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bedrock-agentcore-config-${{ github.sha }}
-          path: ~/.bedrock_agentcore.yaml
+          include-hidden-files: true
+          path: .bedrock_agentcore.yaml
           retention-days: 90
 
       - name: Deployment summary
