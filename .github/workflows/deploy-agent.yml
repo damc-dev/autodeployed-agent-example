@@ -84,8 +84,12 @@ jobs:
             ~/.cargo/bin/uv
           key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Install or restore uv
+        run: |
+          if [ ! -f "$HOME/.cargo/bin/uv" ]; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
