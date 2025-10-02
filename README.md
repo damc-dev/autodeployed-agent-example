@@ -1,33 +1,58 @@
 # Autodeployed Agent Example
 
-This project demonstrates automated deployment of an AWS Bedrock AgentCore agent using GitHub Actions.
+**Deploy AI agents to production with a single `git push`** — this project demonstrates true continuous deployment for AWS Bedrock AgentCore agents using GitHub Actions.
 
 ## Overview
 
-The agent is automatically deployed to AWS when changes are pushed or merged to the `main` branch. The deployment uses AWS Bedrock AgentCore SDK and is configured to run on AWS infrastructure.
+Every commit to `main` automatically:
+- 🚀 **Deploys a new version** of each agent to AWS Bedrock
+- 🏗️ **Builds and pushes** Docker images to Amazon ECR
+- 📦 **Tracks deployment history** via timestamped artifacts
+- ⚡ **Runs in parallel** for multi-agent deployments
 
-## Agent Configuration
+**No manual intervention required.** Push your code, and your agents are live in minutes.
 
-- **Agent ID**: `agent-3aevBK4TEA`
-- **Region**: `us-east-1`
-- **Platform**: `linux/arm64`
-- **Runtime**: Docker
-- **Entrypoint**: `agent.py`
+## How It Works
 
-## Deployment
+### Continuous Deployment Pipeline
 
-### Automated Deployment
+**Each push to `main` triggers a full deployment cycle:**
 
-The agent automatically deploys on:
+```
+git push origin main
+      ↓
+GitHub Actions detects the push
+      ↓
+Workflow extracts all agents from .bedrock_agentcore.yaml
+      ↓
+Parallel deployment begins for each agent
+      ↓
+Docker image built → pushed to ECR → deployed to Bedrock
+      ↓
+New version is live! ✨
+```
+
+The deployment triggers on:
 - Direct pushes to the `main` branch
 - Merged pull requests to `main`
 
-The GitHub Actions workflow ([.github/workflows/deploy-agent.yml](.github/workflows/deploy-agent.yml)):
-1. Checks out the code
-2. Sets up Python and dependencies with `uv`
-3. Configures AWS credentials
-4. Runs `agentcore launch` to deploy
-5. Saves the `.bedrock_agentcore.yaml` configuration as an artifact
+### Deployment Architecture
+
+The GitHub Actions workflow ([.github/workflows/deploy-agent.yml](.github/workflows/deploy-agent.yml)) uses a matrix strategy to deploy multiple agents efficiently:
+
+**Setup Job:**
+1. Extracts all agent names from `.bedrock_agentcore.yaml` using `yq`
+2. Installs Python and `uv` package manager
+3. Installs dependencies once (`uv sync`)
+4. Caches the environment for reuse
+
+**Deploy Jobs (parallel):**
+1. Restores the cached environment
+2. Configures AWS credentials
+3. Runs `agentcore launch --agent {agent-name}` for each agent
+4. Saves agent-specific `.bedrock_agentcore.yaml` as an artifact
+
+This approach eliminates redundant dependency installation, significantly speeding up multi-agent deployments.
 
 ### Setup Requirements
 
@@ -82,11 +107,11 @@ You need to configure AWS authentication for GitHub Actions. Two options:
 
 ### Manual Deployment
 
-To deploy manually:
+To deploy a specific agent:
 
 ```bash
 uv sync
-uv run agentcore launch
+uv run agentcore launch --agent <agent-name>
 ```
 
 ## Development
@@ -105,7 +130,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies
 uv sync
+```
 
+### Local Agent Run
+
+```bash
 # Run the agent locally (if applicable)
 uv run python agent.py
 ```
@@ -119,6 +148,41 @@ curl -X POST http://localhost:8080/invocations \
   -d '{"prompt": "Hello!"}'
 ```
 
+### Adding a New Agent
+
+Adding a new agent is simple and automatically deployed:
+
+```bash
+# Configure a new agent interactively
+uv run agentcore configure --agent <new-agent-name>
+
+# Commit and push
+git add .bedrock_agentcore.yaml
+git commit -m "Add new agent"
+git push origin main
+```
+
+**What happens next:**
+1. Configure command updates `.bedrock_agentcore.yaml` with your new agent
+2. Push to `main` triggers the deployment workflow
+3. Workflow automatically detects the new agent
+4. New agent is built and deployed alongside existing agents in parallel
+5. Your new agent is live! 🎉
+
+**Example:**
+```bash
+# Add a new agent called "summarizer_agent"
+uv run agentcore configure --entrypoint summarizer_agent.py
+
+# Commit and push to deploy
+git add .bedrock_agentcore.yaml
+git commit -m "Add summarizer agent"
+git push origin main
+
+# ✅ Agent automatically deployed to AWS Bedrock
+```
+
+
 ## Project Structure
 
 - `agent.py` - Agent entrypoint
@@ -126,6 +190,23 @@ curl -X POST http://localhost:8080/invocations \
 - `Dockerfile` - Container definition
 - `.github/workflows/deploy-agent.yml` - Deployment workflow
 
-## Artifacts
+## Deployment Versioning & History
 
-After each successful deployment, the workflow uploads the `.bedrock_agentcore.yaml` configuration as an artifact, retained for 90 days. This helps track configuration changes over time.
+Every deployment is tracked and versioned automatically:
+
+### Artifacts
+Each successful deployment creates timestamped artifacts:
+- **Naming**: `bedrock-agentcore-config-{agent-name}-{commit-sha}`
+- **Retention**: 90 days
+- **Purpose**: Full audit trail of deployments and configuration changes
+
+### Version Tracking
+- Each `git push` to `main` creates a new agent version in AWS Bedrock
+- Docker images are tagged with the commit SHA for traceability
+- Deployment artifacts link code changes to production versions
+
+This means you can:
+- 📜 Review deployment history across all agents
+- 🔍 Trace production issues back to specific commits
+- ⏮️ Roll back to any previous configuration
+- 📊 Audit who deployed what and when
