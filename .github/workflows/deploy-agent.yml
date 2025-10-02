@@ -30,28 +30,6 @@ jobs:
           echo "agents=$agents" >> "$GITHUB_OUTPUT"
           echo "Found agents: $agents"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies
-        run: |
-          uv sync
-
-      - name: Cache uv environment
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            .venv
-            ~/.cargo/bin/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-
   deploy:
     needs: setup
     # Loads the secrets from the dev environment from the repository settings
@@ -76,20 +54,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Restore uv environment
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            .venv
-            ~/.cargo/bin/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-
-      - name: Install or restore uv
+      - name: Install uv
         run: |
-          if [ ! -f "$HOME/.cargo/bin/uv" ]; then
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-          fi
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv sync
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
