@@ -95,26 +95,26 @@ source = { virtual = "." }
 dependencies = [
     { name = "bedrock-agentcore" },
     { name = "strands-agents" },
-    { name = "strands-agents-tools" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "bedrock-agentcore-starter-toolkit" },
     { name = "strands-agents-builder" },
+    { name = "strands-agents-tools" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "bedrock-agentcore", specifier = ">=0.1.5" },
     { name = "strands-agents", specifier = ">=1.10.0" },
-    { name = "strands-agents-tools", specifier = ">=0.2.9" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "bedrock-agentcore-starter-toolkit", specifier = ">=0.1.14" },
     { name = "strands-agents-builder", specifier = ">=0.1.10" },
+    { name = "strands-agents-tools", specifier = ">=0.2.9" },
 ]
 
 [[package]]

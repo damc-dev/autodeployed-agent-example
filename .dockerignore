@@ -60,8 +60,8 @@ docs/
 # Project specific
 tests/
 
-# AgentCore CLI config (not needed at runtime)
-agentcore/
+# Bedrock AgentCore specific - keep config but exclude runtime files
+.bedrock_agentcore.yaml
 .dockerignore
 
 # Keep wheelhouse for offline installations

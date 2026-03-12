@@ -7,10 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "bedrock-agentcore>=0.1.5",
     "strands-agents>=1.10.0",
-    "strands-agents-tools>=0.2.9",
 ]
 
 [dependency-groups]
 dev = [
+    "bedrock-agentcore-starter-toolkit>=0.1.14",
     "strands-agents-builder>=0.1.10",
+    "strands-agents-tools>=0.2.9",
 ]
