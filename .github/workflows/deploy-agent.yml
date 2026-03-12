@@ -53,9 +53,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Create agentcore CDK project
-        run: agentcore create -y
-
       - name: Deploy agent with agentcore
         run: agentcore deploy -y
         env:
