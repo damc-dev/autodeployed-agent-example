@@ -1,0 +1,16 @@
+{
+  "name": "autodeployed-agent",
+  "version": "1",
+  "agents": [
+    {
+      "type": "AgentCoreRuntime",
+      "name": "agent",
+      "build": "Container",
+      "entrypoint": "agent.py",
+      "codeLocation": ".",
+      "runtimeVersion": "PYTHON_3_13",
+      "networkMode": "PUBLIC",
+      "instrumentation": { "enabled": true }
+    }
+  ]
+}
