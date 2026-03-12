@@ -8,7 +8,6 @@ Every commit to `main` automatically:
 - 🚀 **Deploys a new version** of each agent to AWS Bedrock
 - 🏗️ **Builds and pushes** Docker images to Amazon ECR
 - 📦 **Tracks deployment history** via timestamped artifacts
-- ⚡ **Runs in parallel** for multi-agent deployments
 
 **No manual intervention required.** Push your code, and your agents are live in minutes.
 
@@ -23,9 +22,7 @@ git push origin main
       ↓
 GitHub Actions detects the push
       ↓
-Workflow extracts all agents from .bedrock_agentcore.yaml
-      ↓
-Parallel deployment begins for each agent
+AWS credentials configured via OIDC
       ↓
 Docker image built → pushed to ECR → deployed to Bedrock
       ↓
@@ -38,29 +35,34 @@ The deployment triggers on:
 
 ### Deployment Architecture
 
-The GitHub Actions workflow ([.github/workflows/deploy-agent.yml](.github/workflows/deploy-agent.yml)) uses a matrix strategy to deploy multiple agents efficiently:
+The GitHub Actions workflow ([.github/workflows/deploy-agent.yml](.github/workflows/deploy-agent.yml)) uses the `@aws/agentcore` npm CLI backed by AWS CDK:
 
-**Setup Job:**
-1. Extracts all agent names from `.bedrock_agentcore.yaml` using `yq`
-2. Installs Python and `uv` package manager
-3. Installs dependencies once (`uv sync`)
-4. Caches the environment for reuse
-
-**Deploy Jobs (parallel):**
-1. Restores the cached environment
-2. Configures AWS credentials
-3. Runs `agentcore launch --agent {agent-name}` for each agent
-4. Saves agent-specific `.bedrock_agentcore.yaml` as an artifact
-
-This approach eliminates redundant dependency installation, significantly speeding up multi-agent deployments.
+1. Checks out code
+2. Installs Node.js and `@aws/agentcore` CLI
+3. Installs `uv` (required by the agentcore CLI for Python agents)
+4. Configures AWS credentials via OIDC
+5. Runs `agentcore deploy -y` which builds the Docker image, pushes to ECR, and deploys to Bedrock AgentCore
 
 ### Setup Requirements
 
+#### Prerequisites
+
+- Node.js 20+
+- [uv](https://github.com/astral-sh/uv) package manager
+- AWS account with CDK bootstrapped in your target region
+
+#### CDK Bootstrap (one-time per account/region)
+
+The `@aws/agentcore` CLI uses AWS CDK internally. Before the first deploy, bootstrap your account:
+
+```bash
+npm install -g @aws/agentcore
+npx cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
+```
+
 #### AWS Configuration
 
-You need to configure AWS authentication for GitHub Actions. Two options:
-
-**Option 1: OIDC (Recommended)**
+Configure AWS authentication for GitHub Actions using OIDC:
 
 1. Create an IAM OIDC identity provider for GitHub Actions:
    ```
@@ -94,32 +96,25 @@ You need to configure AWS authentication for GitHub Actions. Two options:
    - Amazon ECR (push images)
    - AWS CodeBuild (trigger builds)
    - Amazon Bedrock AgentCore (deploy agent)
+   - AWS CloudFormation (CDK stack management)
+   - `sts:AssumeRole` for CDK bootstrap roles (`cdk-hnb659fds-*`)
 
 4. Add the role ARN as a GitHub secret: `AWS_ROLE_ARN`
 
-**Option 2: Access Keys**
-
-1. Create an IAM user with programmatic access
-2. Attach necessary permissions (same as above)
-3. Add GitHub secrets:
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-
 ### Manual Deployment
 
-To deploy a specific agent:
-
 ```bash
-uv sync
-uv run agentcore launch --agent <agent-name>
+npm install -g @aws/agentcore
+agentcore deploy -y
 ```
 
 ## Development
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.13+
 - [uv](https://github.com/astral-sh/uv) package manager
+- Node.js 20+ and `@aws/agentcore` CLI
 - AWS credentials configured
 
 ### Local Setup
@@ -128,20 +123,21 @@ uv run agentcore launch --agent <agent-name>
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies
+# Install Python dependencies
 uv sync
+
+# Install agentcore CLI
+npm install -g @aws/agentcore
 ```
 
-### Local Agent Run
+### Local Agent Development
 
 ```bash
-# Run the agent locally (if applicable)
-uv run python agent.py
+# Run the agent locally with a live reload server
+agentcore dev
 ```
 
-### Local Invocation
-You can invoke the agent locally for testing:
-
+Then in another terminal:
 ```bash
 curl -X POST http://localhost:8080/invocations \
   -H "Content-Type: application/json" \
@@ -150,55 +146,48 @@ curl -X POST http://localhost:8080/invocations \
 
 ### Adding a New Agent
 
-Adding a new agent is simple and automatically deployed:
+1. Add a new entry to `agentcore/agentcore.json`:
+   ```json
+   {
+     "type": "AgentCoreRuntime",
+     "name": "my-new-agent",
+     "build": "Container",
+     "entrypoint": "my_agent.py",
+     "codeLocation": ".",
+     "runtimeVersion": "PYTHON_3_13"
+   }
+   ```
 
-```bash
-# Configure a new agent interactively
-uv run agentcore configure --agent <new-agent-name>
+2. Commit and push:
+   ```bash
+   git add agentcore/agentcore.json my_agent.py
+   git commit -m "Add my-new-agent"
+   git push origin main
+   ```
 
-# Commit and push
-git add .bedrock_agentcore.yaml
-git commit -m "Add new agent"
-git push origin main
-```
-
-**What happens next:**
-1. Configure command updates `.bedrock_agentcore.yaml` with your new agent
-2. Push to `main` triggers the deployment workflow
-3. Workflow automatically detects the new agent
-4. New agent is built and deployed alongside existing agents in parallel
-5. Your new agent is live! 🎉
-
-**Example:**
-```bash
-# Add a new agent called "summarizer_agent"
-uv run agentcore configure --entrypoint summarizer_agent.py
-
-# Commit and push to deploy
-git add .bedrock_agentcore.yaml
-git commit -m "Add summarizer agent"
-git push origin main
-
-# ✅ Agent automatically deployed to AWS Bedrock
-```
-
+The workflow automatically deploys the new agent alongside existing ones.
 
 ## Project Structure
 
-- `agent.py` - Agent entrypoint
-- `.bedrock_agentcore.yaml` - Agent configuration
-- `Dockerfile` - Container definition
-- `.github/workflows/deploy-agent.yml` - Deployment workflow
+```
+agent.py                          # Agent entrypoint
+agentcore/
+  agentcore.json                  # Agent configuration
+  aws-targets.json                # Deployment target (account/region)
+  cdk/                            # CDK app (managed by agentcore CLI)
+Dockerfile                        # Container definition
+.github/workflows/deploy-agent.yml  # Deployment workflow
+```
 
 ## Deployment Versioning & History
 
 Every deployment is tracked and versioned automatically:
 
 ### Artifacts
-Each successful deployment creates timestamped artifacts:
-- **Naming**: `bedrock-agentcore-config-{agent-name}-{commit-sha}`
+Each successful deployment creates artifacts:
+- **Naming**: `agentcore-config-{commit-sha}`
+- **Contents**: `agentcore/agentcore.json` and `agentcore/aws-targets.json`
 - **Retention**: 90 days
-- **Purpose**: Full audit trail of deployments and configuration changes
 
 ### Version Tracking
 - Each `git push` to `main` creates a new agent version in AWS Bedrock
