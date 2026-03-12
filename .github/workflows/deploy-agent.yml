@@ -11,12 +11,35 @@ on:
       - closed
 
 jobs:
-  deploy:
+  setup:
     # Only run on push to main or when PR is merged to main
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    outputs:
+      agents: ${{ steps.get-agents.outputs.agents }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract agent names from config
+        id: get-agents
+        run: |
+          # Extract agent names from YAML using yq
+          agents=$(yq eval '.agents | keys' .bedrock_agentcore.yaml -o=json -I=0)
+          echo "agents=$agents" >> "$GITHUB_OUTPUT"
+          echo "Found agents: $agents"
+
+  deploy:
+    needs: setup
     # Loads the secrets from the dev environment from the repository settings
     environment: dev
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        agent: ${{ fromJSON(needs.setup.outputs.agents) }}
+      fail-fast: false
 
     permissions:
       id-token: write
@@ -26,18 +49,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install agentcore CLI
-        run: npm install -g @aws/agentcore
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
       - name: Install uv
         run: |
@@ -45,7 +60,8 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
-        run: uv sync
+        run: |
+          uv sync
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -54,7 +70,9 @@ jobs:
           aws-region: us-east-1
 
       - name: Deploy agent with agentcore
-        run: agentcore deploy -y
+        run: |
+          uv run agentcore launch --agent ${{ matrix.agent }}
+          cat .bedrock_agentcore.yaml
         env:
           AWS_DEFAULT_REGION: us-east-1
 
@@ -62,10 +80,12 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: agentcore-config-${{ github.sha }}
-          path: agentcore/
+          name: bedrock-agentcore-config-${{ matrix.agent }}-${{ github.sha }}
+          include-hidden-files: true
+          path: .bedrock_agentcore.yaml
           retention-days: 90
 
       - name: Deployment summary
         if: success()
-        run: echo "Agent deployed successfully to AWS"
+        run: |
+          echo "✅ Agent '${{ matrix.agent }}' deployed successfully to AWS"
